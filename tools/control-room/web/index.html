@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Control Room</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --panel2:#1e2740; --line:#2b3550;
+    --fg:#e7ecf5; --muted:#93a0bd; --accent:#5b9dff; --accent2:#7b61ff;
+    --ok:#39d98a; --warn:#ffb020; --err:#ff5d6c; --gate:#ffd166;
+    --radius:12px; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:12px;padding:12px 18px;
+    border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.2px}
+  header .proj{color:var(--muted);font-family:var(--mono);font-size:12px}
+  header .sp{flex:1}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .pill.on{color:var(--ok);border-color:var(--ok)}
+  .pill.off{color:var(--err);border-color:var(--err)}
+  main{display:grid;grid-template-columns:300px 1fr 360px;gap:14px;padding:14px;align-items:start}
+  @media(max-width:1100px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .card>h2{margin:0;padding:11px 14px;font-size:12px;letter-spacing:.6px;text-transform:uppercase;
+    color:var(--muted);border-bottom:1px solid var(--line);background:var(--panel2)}
+  .card .body{padding:12px 14px}
+  .run{padding:9px 11px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer;background:var(--panel2)}
+  .run:hover{border-color:var(--accent)}
+  .run.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .run .t{font-weight:600}
+  .run .m{color:var(--muted);font-size:12px;font-family:var(--mono)}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .s-running{background:var(--accent)} .s-done{background:var(--ok)}
+  .s-blocked{background:var(--gate)} .s-failed{background:var(--err)} .s-pending{background:var(--muted)}
+  .stage{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;margin-bottom:6px;background:var(--panel2)}
+  .stage .n{font-weight:600} .stage .a{color:var(--muted);font-size:12px}
+  .stage .st{margin-left:auto;font-size:11px;font-family:var(--mono);color:var(--muted)}
+  .stage a{color:var(--accent);font-size:12px;text-decoration:none}
+  .events{font-family:var(--mono);font-size:12px;max-height:280px;overflow:auto;border-top:1px dashed var(--line);margin-top:10px;padding-top:8px}
+  .ev{padding:2px 0;color:var(--muted)}
+  .ev .ty{color:var(--accent)} .ev.gate .ty{color:var(--gate)} .ev.error .ty{color:var(--err)}
+  .gate{border:1px solid var(--gate);border-radius:10px;padding:12px;margin-bottom:10px;background:rgba(255,209,102,.06)}
+  .gate h3{margin:0 0 4px;font-size:14px}
+  .gate p{margin:0 0 10px;color:var(--muted);font-size:13px;white-space:pre-wrap}
+  .gate .opts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  button{font:inherit;cursor:pointer;border-radius:9px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--fg);padding:7px 12px}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#06101f;font-weight:600}
+  button.go{background:var(--ok);border-color:var(--ok);color:#06101f;font-weight:600}
+  input,textarea,select{font:inherit;background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+    border-radius:9px;padding:8px 10px;width:100%}
+  textarea{resize:vertical;min-height:58px}
+  .row{display:flex;gap:8px;margin-bottom:8px}
+  label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+  .bug{border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:8px;background:var(--panel2);cursor:grab}
+  .bug:active{cursor:grabbing}
+  .bug .k{font-family:var(--mono);color:var(--accent);font-size:12px}
+  .bug .pr{font-size:11px;color:var(--muted)}
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:20px;text-align:center;color:var(--muted);margin-bottom:10px;transition:.15s}
+  .drop.hot{border-color:var(--ok);color:var(--ok);background:rgba(57,217,138,.08)}
+  .empty{color:var(--muted);font-size:13px;padding:6px 0}
+  .toast{position:fixed;bottom:16px;right:16px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:10px;padding:10px 14px;max-width:360px;font-size:13px;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+  .badge{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛰️ Control Room</h1>
+  <span class="proj" id="proj">…</span>
+  <span class="sp"></span>
+  <span class="pill" id="orcaPill">orca ?</span>
+  <span class="pill on" id="live">live</span>
+</header>
+
+<main>
+  <!-- LEFT: runs + build -->
+  <section>
+    <div class="card">
+      <h2>Chạy build từ spec</h2>
+      <div class="body">
+        <label>Mô tả feature (1–3 câu outcome)</label>
+        <textarea id="buildDesc" placeholder="vd: Màn Book Detail hiển thị chi tiết sách + nút lưu kệ"></textarea>
+        <div class="row" style="margin-top:8px">
+          <input id="buildSlug" placeholder="slug (optional)" style="flex:1">
+          <button class="primary" id="buildBtn">Start</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>Runs</h2>
+      <div class="body" id="runs"><div class="empty">đang tải…</div></div>
+    </div>
+  </section>
+
+  <!-- CENTER: pipeline progress + gate inbox + events -->
+  <section>
+    <div class="card">
+      <h2>Tiến trình <span id="runTitle" class="badge">—</span></h2>
+      <div class="body">
+        <div id="gates"></div>
+        <div id="stages"><div class="empty">Chọn một run bên trái để xem tiến trình.</div></div>
+        <div class="events" id="events"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: bug panel -->
+  <section>
+    <div class="card">
+      <h2>Bug panel (Jira)</h2>
+      <div class="body">
+        <div class="row">
+          <input id="jiraKey" placeholder="project key (vd ABC)" style="flex:1">
+          <button id="refreshBugs">Refresh</button>
+        </div>
+        <div class="drop" id="drop">⤵︎ Kéo bug card vào đây để <b>Fix</b></div>
+        <div id="bugs"><div class="empty">Chưa có bug. Nhập project key rồi Refresh.</div></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (s,el=document)=>el.querySelector(s);
+let selRun=null, es=null, cfg={};
+
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.innerHTML=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),5000); }
+async function api(path, opts){ const r=await fetch(path,opts); if(!r.ok){ let e; try{e=await r.json()}catch(_){e={error:r.statusText}}
+  throw new Error(e.error||('HTTP '+r.status)); } return r.json(); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function loadConfig(){ cfg=await api('/api/config'); $('#proj').textContent=cfg.project;
+  const pill=$('#orcaPill'); pill.textContent= cfg.has_orca?'orca ✓':'orca ✗';
+  pill.className='pill '+(cfg.has_orca?'on':'off');
+  if(cfg.default_jira_project) $('#jiraKey').value=cfg.default_jira_project; }
+
+async function loadRuns(){
+  const {runs}=await api('/api/runs'); const box=$('#runs');
+  if(!runs.length){ box.innerHTML='<div class="empty">Chưa có run nào. Chạy build hoặc fix bug để tạo.</div>'; return; }
+  box.innerHTML='';
+  for(const r of runs){
+    const d=document.createElement('div'); d.className='run'+(r.run_id===selRun?' sel':'');
+    const pend=(r.gates_pending&&r.gates_pending.length)?` <span class="badge" style="border-color:var(--gate);color:var(--gate)">gate ${r.gates_pending.length}</span>`:'';
+    d.innerHTML=`<div class="t"><span class="dot s-${esc(r.status)}"></span>${esc(r.title||r.run_id)}${pend}</div>
+      <div class="m">${esc(r.kind)} · ${esc(r.run_id)} · ${esc(r.source)}</div>`;
+    d.onclick=()=>selectRun(r.run_id); box.appendChild(d);
+  }
+}
+
+async function selectRun(id){ selRun=id; await loadRuns(); await renderRun(); openStream(); }
+
+async function renderRun(){
+  if(!selRun) return;
+  const r=await api('/api/run?run='+encodeURIComponent(selRun));
+  $('#runTitle').textContent=r.title||r.run_id;
+  // gates
+  const g=$('#gates'); g.innerHTML='';
+  for(const gate of (r.gates||[])) g.appendChild(gateCard(gate));
+  // stages
+  const st=$('#stages');
+  if(!(r.stages||[]).length){ st.innerHTML='<div class="empty">Chưa có stage.</div>'; }
+  else{ st.innerHTML=''; for(const s of r.stages){
+    const el=document.createElement('div'); el.className='stage';
+    const art=s.artifact?` · <a href="#" title="${esc(s.artifact)}">${esc(s.artifact.split('/').pop())}</a>`:'';
+    el.innerHTML=`<span class="dot s-${esc(s.status)}"></span><span class="n">${esc(s.name||s.id)}</span>
+      <span class="a">${esc(s.agent||'')}</span><span class="st">${esc(s.status||'')}${art}</span>`;
+    st.appendChild(el);
+  } }
+  // events (initial)
+  const ev=$('#events'); ev.innerHTML='';
+  for(const e of (r.events||[])) appendEvent(e);
+  if(r.pr&&r.pr.url){ const p=document.createElement('div'); p.className='ev';
+    p.innerHTML=`<span class="ty">PR</span> <a href="${esc(r.pr.url)}" target="_blank">${esc(r.pr.url)}</a> [${esc(r.pr.state)}]`;
+    ev.appendChild(p); }
+  ev.scrollTop=ev.scrollHeight;
+}
+
+function gateCard(gate){
+  const el=document.createElement('div'); el.className='gate';
+  const refs=(gate.context_refs||[]).map(x=>`<a href="#" title="${esc(x)}">${esc(x.split('/').pop())}</a>`).join(' · ');
+  el.innerHTML=`<h3>🚦 ${esc(gate.title)}</h3><p>${esc(gate.question||'')}</p>
+    ${refs?`<div class="m" style="margin-bottom:8px">${refs}</div>`:''}<div class="opts"></div>
+    ${gate.allow_freeform?'<input class="note" placeholder="ghi chú (optional)">':''}`;
+  const opts=$('.opts',el);
+  for(const o of (gate.options||[])){
+    const b=document.createElement('button'); b.className='primary'; b.textContent=o.label;
+    b.onclick=async()=>{ b.disabled=true; const note=$('.note',el)?$('.note',el).value:'';
+      try{ await api('/api/gate/answer',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({run:selRun,gate_id:gate.id,option_id:o.id,note})});
+        toast('✅ Đã trả lời gate: <b>'+esc(o.label)+'</b> — agent sẽ tiếp tục.'); renderRun();
+      }catch(e){ b.disabled=false; toast('❌ '+esc(e.message)); } };
+    opts.appendChild(b);
+  }
+  return el;
+}
+
+function appendEvent(e){
+  const ev=$('#events'); const d=document.createElement('div');
+  const cls = e.type && e.type.startsWith('gate')?'gate':(e.level==='error'?'error':'');
+  d.className='ev '+cls;
+  d.innerHTML=`<span class="ty">${esc(e.type||'log')}</span> ${esc(e.msg||'')}${e.ref?` <span class="m">(${esc(e.ref)})</span>`:''}`;
+  ev.appendChild(d); ev.scrollTop=ev.scrollHeight;
+}
+
+function openStream(){
+  if(es) es.close();
+  es=new EventSource('/api/events?run='+encodeURIComponent(selRun));
+  es.onmessage=(m)=>{ try{ const e=JSON.parse(m.data); appendEvent(e);
+    if((e.type||'').startsWith('gate')||(e.type||'').startsWith('stage')||(e.type||'').startsWith('run_')||e.type==='pr'){ renderRun(); loadRuns(); } }catch(_){} };
+  es.onerror=()=>{ $('#live').className='pill off'; $('#live').textContent='reconnect…'; };
+  es.onopen=()=>{ $('#live').className='pill on'; $('#live').textContent='live'; };
+}
+
+// build
+$('#buildBtn').onclick=async()=>{
+  const description=$('#buildDesc').value.trim(); if(!description){ toast('Nhập mô tả feature.'); return; }
+  const slug=$('#buildSlug').value.trim();
+  try{ const r=await api('/api/build',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({description,slug})});
+    toast('🚀 Đã start build — run <b>'+esc(r.run_id)+'</b>'); await loadRuns(); selectRun(r.run_id);
+  }catch(e){ toast('❌ build: '+esc(e.message)); }
+};
+
+// bugs
+async function loadBugs(){
+  const {bugs}=await api('/api/bugs'); const box=$('#bugs');
+  if(!bugs.length){ box.innerHTML='<div class="empty">Chưa có bug. Nhập project key rồi Refresh.</div>'; return; }
+  box.innerHTML='';
+  for(const b of bugs){
+    const key=b.key||b.id||''; const d=document.createElement('div'); d.className='bug'; d.draggable=true;
+    d.innerHTML=`<div class="k">${esc(key)} <span class="pr">${esc(b.priority||'')} ${esc(b.status||'')}</span></div>
+      <div>${esc(b.title||b.summary||'')}</div>`;
+    d.addEventListener('dragstart',ev=>ev.dataTransfer.setData('text/plain',key));
+    box.appendChild(d);
+  }
+}
+$('#refreshBugs').onclick=async()=>{
+  const pk=$('#jiraKey').value.trim(); if(!pk){ toast('Nhập project key.'); return; }
+  try{ await api('/api/bugs/refresh',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({project_key:pk})});
+    toast('⏳ Đã giao agent fetch Jira ('+esc(pk)+'). Bug sẽ hiện khi fetch xong — bấm Refresh lại.');
+  }catch(e){ toast('❌ refresh: '+esc(e.message)); }
+  setTimeout(loadBugs,1500);
+};
+const drop=$('#drop');
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('hot');});
+drop.addEventListener('dragleave',()=>drop.classList.remove('hot'));
+drop.addEventListener('drop',async e=>{
+  e.preventDefault(); drop.classList.remove('hot');
+  const key=e.dataTransfer.getData('text/plain'); if(!key) return;
+  try{ const r=await api('/api/bugs/fix',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({keys:[key],mode:'note'})});
+    toast('🔧 Đã spawn bug-fix cho <b>'+esc(key)+'</b> — run '+esc(r.run_id)); await loadRuns(); selectRun(r.run_id);
+  }catch(err){ toast('❌ fix: '+esc(err.message)); }
+});
+
+(async function(){ await loadConfig(); await loadRuns(); await loadBugs();
+  setInterval(loadRuns,8000); })();
+</script>
+</body>
+</html>
